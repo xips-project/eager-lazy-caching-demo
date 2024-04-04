@@ -1,6 +1,5 @@
 package cat.uvic.fetchtypecachedemo;
 
-import cat.uvic.fetchtypecachedemo.entity.Author;
 import cat.uvic.fetchtypecachedemo.entity.Book;
 import cat.uvic.fetchtypecachedemo.entity.Publisher;
 import cat.uvic.fetchtypecachedemo.service.AuthorService;
@@ -13,15 +12,19 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.LazyInitializationException;
+import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SpringBootTest
 @Slf4j
@@ -151,9 +154,6 @@ class FetchTypeCacheDemoApplicationTests {
 
     }
 
-    // Hibernate level 1 cache tet, querying for an object present in the
-    // persistence context doesn't produce additional queries to de db, and is
-    // instead loaded from the level 1 cache
     @Test
     void multipleQueriesForSameObjectShouldProduceOneQueryToDB(){
         SQLStatementCountValidator.reset();
@@ -171,6 +171,30 @@ class FetchTypeCacheDemoApplicationTests {
         entityManager1.close();
         SQLStatementCountValidator.assertSelectCount(1);
     }
+
+    // Hibernate level 1 cache test, querying the same object produces no additional
+    // trips to the db
+    @Test
+    void multipleQueriesForSameObjectShouldProduceTwoQueriesToDbAfterClearing(){
+        SQLStatementCountValidator.reset();
+        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
+        EntityTransaction transaction = entityManager1.getTransaction();
+        transaction.begin();
+
+        Publisher publisher = entityManager1.find(Publisher.class,1L);
+
+        Session session = entityManager1.unwrap(Session.class);
+        session.evict(publisher);
+        entityManager1.clear();
+
+        Publisher publisher2 = entityManager1.find(Publisher.class,1L);
+
+        transaction.commit();
+        entityManager1.close();
+        SQLStatementCountValidator.assertSelectCount(2);
+    }
+
+
 
 
     // JPA ENTITY GRAPHS GO HERE
