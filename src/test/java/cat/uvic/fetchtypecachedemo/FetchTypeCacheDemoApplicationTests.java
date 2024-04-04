@@ -1,5 +1,6 @@
 package cat.uvic.fetchtypecachedemo;
 
+import cat.uvic.fetchtypecachedemo.entity.Author;
 import cat.uvic.fetchtypecachedemo.entity.Book;
 import cat.uvic.fetchtypecachedemo.entity.Publisher;
 import cat.uvic.fetchtypecachedemo.service.AuthorService;
@@ -148,6 +149,27 @@ class FetchTypeCacheDemoApplicationTests {
         // Only 2 queries are run and both Books and Authors are loaded
         SQLStatementCountValidator.assertSelectCount(2);
 
+    }
+
+    // Hibernate level 1 cache tet, querying for an object present in the
+    // persistence context doesn't produce additional queries to de db, and is
+    // instead loaded from the level 1 cache
+    @Test
+    void multipleQueriesForSameObjectShouldProduceOneQueryToDB(){
+        SQLStatementCountValidator.reset();
+        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
+        EntityTransaction transaction = entityManager1.getTransaction();
+        transaction.begin();
+
+        Publisher publisher = entityManager1.find(Publisher.class,1L);
+        Publisher publisher2 = entityManager1.find(Publisher.class,1L);
+        Publisher publisher3 = entityManager1.find(Publisher.class,1L);
+        Publisher publisher4 = entityManager1.find(Publisher.class,1L);
+        Publisher publisher5 = entityManager1.find(Publisher.class,1L);
+
+        transaction.commit();
+        entityManager1.close();
+        SQLStatementCountValidator.assertSelectCount(1);
     }
 
 
