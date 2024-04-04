@@ -154,6 +154,8 @@ class FetchTypeCacheDemoApplicationTests {
 
     }
 
+    // Hibernate level 1 cache test, querying the same object produces no additional
+    // trips to the db
     @Test
     void multipleQueriesForSameObjectShouldProduceOneQueryToDB(){
         SQLStatementCountValidator.reset();
@@ -173,7 +175,8 @@ class FetchTypeCacheDemoApplicationTests {
     }
 
     // Hibernate level 1 cache test, querying the same object produces no additional
-    // trips to the db
+    // trips to the db, after removing the object from the session cache, another
+    // trip to the db is needed, resulting in 2 db accesses.
     @Test
     void multipleQueriesForSameObjectShouldProduceTwoQueriesToDbAfterClearing(){
         SQLStatementCountValidator.reset();
