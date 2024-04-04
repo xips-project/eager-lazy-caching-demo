@@ -1,4 +1,4 @@
-package cat.uvic.fetchtypecachedemo;
+package cat.uvic.fetchtypecachedemo.config;
 
 import net.ttddyy.dsproxy.listener.logging.SLF4JLogLevel;
 import net.ttddyy.dsproxy.support.ProxyDataSourceBuilder;
