@@ -11,7 +11,7 @@
 + Test Fetching and evicting from level 1 cache
 
 
-## [JPA Entity Graph tests](src/test/java/cat/uvic/fetchtypecachedemo/JpaEntityGraphTest.java#L3)
+## [JPA Entity Graph tests](src/test/java/cat/uvic/fetchtypecachedemo/JpaEntityGraphTest.java)
 
 
 * Changing fetching behaviour at runtime with jpa entity graph
