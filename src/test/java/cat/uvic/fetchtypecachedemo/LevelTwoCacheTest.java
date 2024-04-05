@@ -16,6 +16,7 @@ public class LevelTwoCacheTest {
 
     @Test
     void cacheManagerClassShouldMatchCaffeineCacheManager(){
-        assertEquals(CaffeineCacheManager.class,cacheManager.getClass());
+        Class<? extends CacheManager> clazz = cacheManager.getClass();
+        assertEquals(clazz, CaffeineCacheManager.class);
     }
 }
