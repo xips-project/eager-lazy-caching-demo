@@ -2,49 +2,44 @@ package cat.uvic.fetchtypecachedemo;
 
 import cat.uvic.fetchtypecachedemo.entity.Book;
 import cat.uvic.fetchtypecachedemo.entity.Publisher;
-import cat.uvic.fetchtypecachedemo.service.AuthorService;
-import cat.uvic.fetchtypecachedemo.service.BookService;
 import cat.uvic.fetchtypecachedemo.service.PublisherService;
 import com.vladmihalcea.sql.SQLStatementCountValidator;
-import jakarta.persistence.EntityGraph;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
-import lombok.extern.slf4j.Slf4j;
 import org.hibernate.LazyInitializationException;
-import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.jdbc.Sql;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SpringBootTest
-@Slf4j
-@Sql(value = {"schema.sql", "data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class FetchTypeCacheDemoApplicationTests {
+public class EagerVsLazyLoadingTest {
 
     @Autowired
-    AuthorService authorService;
-
-    @Autowired
-    BookService bookService;
+    private EntityManagerFactory entityManagerFactory;
 
     @Autowired
     PublisherService publisherService;
 
-    @Autowired
-    EntityManager entityManager;
+    private EntityManager entityManager;
 
-    @Autowired
-    EntityManagerFactory entityManagerFactory;
+    @PostConstruct
+    void setUp() {
+        entityManager = entityManagerFactory.createEntityManager();
+    }
+
+    @PreDestroy
+    void closeEntityManager(){
+        entityManager.close();
+    }
 
 
     // Can't access lazy loaded entity collection, only first publisher select query is run
@@ -90,18 +85,17 @@ class FetchTypeCacheDemoApplicationTests {
     void accessPropertyLoadingWithJoinFetch() {
         SQLStatementCountValidator.reset();
 
-        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager1.getTransaction();
+        EntityTransaction transaction = entityManager.getTransaction();
         transaction.begin();
 
         String hql = "SELECT DISTINCT p FROM Publisher p " +
                 "JOIN FETCH p.books";
-        List<Publisher> publishers = entityManager1.createQuery(hql, Publisher.class).getResultList();
+        List<Publisher> publishers = entityManager.createQuery(hql, Publisher.class).getResultList();
 
         publishers.stream().map(Publisher::getBooks).map(Collection::stream).forEach(System.out::println);
 
         transaction.commit();
-        entityManager1.close();
+
 
         // Only 1 query is run and both Books and Authors are loaded
         SQLStatementCountValidator.assertSelectCount(1);
@@ -133,13 +127,12 @@ class FetchTypeCacheDemoApplicationTests {
     void loadLazyCollectionUsingJoinFetch() {
         SQLStatementCountValidator.reset();
 
-        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager1.getTransaction();
+        EntityTransaction transaction = entityManager.getTransaction();
         transaction.begin();
 
         String hql = "SELECT DISTINCT p FROM Publisher p " +
                 "JOIN FETCH p.books";
-        List<Publisher> publishers = entityManager1.createQuery(hql, Publisher.class).getResultList();
+        List<Publisher> publishers = entityManager.createQuery(hql, Publisher.class).getResultList();
 
         // Accessing authors within the transactional context
         publishers.stream().map(Publisher::getBooks)
@@ -147,99 +140,10 @@ class FetchTypeCacheDemoApplicationTests {
                 .forEach(System.out::println);
 
         transaction.commit();
-        entityManager1.close();
 
         // Only 2 queries are run and both Books and Authors are loaded
         SQLStatementCountValidator.assertSelectCount(2);
 
     }
-
-    // Hibernate level 1 cache test, querying the same object produces no additional
-    // trips to the db
-    @Test
-    void multipleQueriesForSameObjectShouldProduceOneQueryToDB(){
-        SQLStatementCountValidator.reset();
-        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager1.getTransaction();
-        transaction.begin();
-
-        Publisher publisher = entityManager1.find(Publisher.class,1L);
-        Publisher publisher2 = entityManager1.find(Publisher.class,1L);
-        Publisher publisher3 = entityManager1.find(Publisher.class,1L);
-        Publisher publisher4 = entityManager1.find(Publisher.class,1L);
-        Publisher publisher5 = entityManager1.find(Publisher.class,1L);
-
-        transaction.commit();
-        entityManager1.close();
-        SQLStatementCountValidator.assertSelectCount(1);
-    }
-
-    // Hibernate level 1 cache test, querying the same object produces no additional
-    // trips to the db, after removing the object from the session cache, another
-    // trip to the db is needed, resulting in 2 db accesses.
-    @Test
-    void multipleQueriesForSameObjectShouldProduceTwoQueriesToDbAfterClearing(){
-        SQLStatementCountValidator.reset();
-        EntityManager entityManager1 = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager1.getTransaction();
-        transaction.begin();
-
-        Publisher publisher = entityManager1.find(Publisher.class,1L);
-
-        Session session = entityManager1.unwrap(Session.class);
-        session.evict(publisher);
-        entityManager1.clear();
-
-        Publisher publisher2 = entityManager1.find(Publisher.class,1L);
-
-        transaction.commit();
-        entityManager1.close();
-        SQLStatementCountValidator.assertSelectCount(2);
-    }
-
-
-
-
-    // JPA ENTITY GRAPHS GO HERE
-    @Test
-    void entityGraph1() {
-        SQLStatementCountValidator.reset();
-
-
-
-        EntityGraph<?> entityGraph = entityManager.getEntityGraph("publish-entity-graph-with-books-and-authors");
-        Map<String,Object> properties = new HashMap<>();
-        properties.put("jakarta.persistence.fetchgraph", entityGraph);
-        Publisher publisher = entityManager.find(Publisher.class, 1L, properties);
-
-
-        System.out.println(publisher.getBooks());
-
-
-        SQLStatementCountValidator.assertSelectCount(4);
-
-
-    }
-
-    @Test
-    void entityGraph2() {
-        SQLStatementCountValidator.reset();
-
-
-
-        EntityGraph<Publisher> entityGraph = (EntityGraph<Publisher>) entityManager.getEntityGraph("publish-entity-graph-with-books-and-authors");
-        List<Publisher> publishers = entityManager.createQuery("select p from Publisher p", Publisher.class)
-                .setHint("javax.persistence.fetchgraph", entityGraph)
-                .getResultList();
-
-
-
-
-
-        SQLStatementCountValidator.assertSelectCount(1);
-
-
-    }
-
 
 }
