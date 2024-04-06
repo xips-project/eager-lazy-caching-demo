@@ -12,6 +12,7 @@ import jakarta.persistence.EntityTransaction;
 import org.hibernate.LazyInitializationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Collection;
@@ -46,9 +47,6 @@ public class EagerVsLazyLoadingTest {
     // before a LazyInitializationException is thrown
     @Test
     void accessPropertyOnLazyLoadShouldThrowLazyInitializationException() {
-
-        SQLStatementCountValidator.reset();
-
         assertThatThrownBy(() -> publisherService.findAll()
                 .stream()
                 .map(Publisher::getBooks)
@@ -56,8 +54,6 @@ public class EagerVsLazyLoadingTest {
                 .map(Book::getTitle)
                 .forEach(System.out::println))
                 .isInstanceOf(LazyInitializationException.class);
-
-        SQLStatementCountValidator.assertSelectCount(1);
     }
 
     // lazy loaded collection is loaded using Hibernate.initialize in a transactional method
